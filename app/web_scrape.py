@@ -1,7 +1,9 @@
 import requests
-import json
+from datetime import datetime as dt, timedelta as td
 from app import cruise, cruise_methods as cm
 
+auth_token = ''
+token_expires = None
 
 def generatepostdataandurl(id, adultcount=2, childcount=0, nonadultages=None, currency='USD'):
     if not nonadultages:
@@ -15,12 +17,28 @@ def generatepostdataandurl(id, adultcount=2, childcount=0, nonadultages=None, cu
             "childCount": childcount, "nonAdultAges": nonadultages}], "currency": currency}
 
 
-def gettoken():
+def refresh_token():
+    global auth_token
+    global token_expires
+
     # return json object with "access_token" and "expires_in" fields (seconds)
-    with requests.session() as c:
-        r = c.get("https://disneycruise.disney.go.com/wam/authentication/get-client-token/")  # GET token
-        return r.json()
+    try:
+        with requests.session() as c:
+            r = c.get("https://disneycruise.disney.go.com/wam/authentication/get-client-token/")  # GET token
+            auth_token = r["access_token"]
+            token_expires_seconds = r['expires_in']
+
+            token_expires = dt.now() + td(seconds=int(token_expires_seconds))
+
+            return True
+    except Exception as e:
+        print e
+        return False
         # return re.search('token=(.*?);', r.headers['Set-Cookie']).group(1)  # get oauth token from cookie in header
+
+
+def is_token_expired():
+    a=0
 
 
 def getjsonfrompost(url, data, token=None):
@@ -32,12 +50,11 @@ def getjsonfrompost(url, data, token=None):
         return requests.post(url, json=data).json()
 
 
-def getalllistingids():
+def getalllistingids(token):
     url = 'https://disneycruise.disney.go.com/wam/cruise-sales-service/cruise-listing/?region=INTL&storeId=DCL&view=cruise-listing'
     data = {"currency": "USD", "affiliations": [], "partyMix": [{"accessible": "false", "adultCount":2, "childCount": 0,
                                                                  "orderBuilderId": "null", "nonAdultAges":[],
                                                                  "partyMixId":"0"}]}
-    token = gettoken()["access_token"]
 
     j = getjsonfrompost(url, data, token)
 
@@ -49,18 +66,18 @@ def getalllistingids():
     return listings
 
 
-t = gettoken()["access_token"]
+#t = gettoken()["access_token"]
 
-ids = getalllistingids()
+
 #ids = ['DM1062']
 
-c = cm.Cruise.query.filter_by(sailing_id=ids[0]).first()
-print c.name
+#c = cm.Cruise.query.filter_by(sailing_id=ids[0]).first()
+# print c.name
+#
+# for r in c.rooms:
+#     print str(r.name) + " " + str(r.price)
 
-for r in c.rooms:
-    print str(r.name) + " " + str(r.price)
-
-def getcruisebyid(ids):
+def getcruisebyid(ids, token):
     for id in ids:
 
         if not cm.cruiseexists(id):
@@ -69,14 +86,14 @@ def getcruisebyid(ids):
 
             print "got url for id: " + id
 
-            j = getjsonfrompost(url, pdata, t)
+            j = getjsonfrompost(url, pdata, token)
 
             if 'err' in j:
                 while j['err']:
                     print "Token expired, getting a new one"
-                    t = gettoken()["access_token"]
+                    #t = gettoken()["access_token"]
 
-                    j = getjsonfrompost(url, pdata, t)  # retry getting data
+                    #j = getjsonfrompost(url, pdata, t)  # retry getting data
 
             #print "got json for id: " + id
 

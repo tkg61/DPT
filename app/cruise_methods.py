@@ -1,6 +1,7 @@
 from models import Room, Cruise, Port
 from app import db
 from datetime import datetime as dt
+from app import web_scrape as ws
 
 def createroom(sailing_availability):
     sailing_id = sailing_availability['sailingId']
@@ -130,3 +131,42 @@ def checkports(ports):
 
 def cruiseexists(id):
     return True if Cruise.query.filter_by(sailing_id=id).first() else False
+
+
+def update_all_cruises(token):
+    t = ws.gettoken()["access_token"]
+    ids = ws.getalllistingids(t)
+
+    for id in ids:
+
+        if not cruiseexists(id):
+
+            url, pdata = ws.generatepostdataandurl(str(id))
+
+            print "got url for id: " + id
+
+            j = ws.getjsonfrompost(url, pdata, t)
+
+            if 'err' in j:
+                while j['err']:
+                    print "Token expired, getting a new one"
+                    t = gettoken()["access_token"]
+
+                    j = getjsonfrompost(url, pdata, t)  # retry getting data
+
+            #print "got json for id: " + id
+
+            try:
+                cm.createcruise(j["cruise-sailing"])
+            except Exception as e:
+                print e
+                print j
+            try:
+                cm.createroom(j["sailing-availability"])
+            except Exception as e:
+                print e
+                print j
+
+            print "created objects for cruise and room for id: " + id
+        else:
+            print "cruise exists: " + id
