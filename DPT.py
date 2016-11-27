@@ -1,12 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, abort, session
 from app import app, db, models, web_scrape as ws, cruise_methods as cm
 import schedule
-import time
+
 
 @app.route('/')
 def home():
     return render_template('index.html')
-    #return 'Hello World!'
+    # return 'Hello World!'
 
 
 @app.route('/signup', methods=['POST'])
@@ -22,12 +22,17 @@ def message():
     if 'username' not in session:
         return abort(403)
     return render_template('message.html', username=session['username'],
-                                           message=session['message'])
+                           message=session['message'])
+
 
 def run_scheduled_tasks():
     schedule.every(120).seconds.do(ws.refresh_token)
-    #schedule.every(2).seconds.do(job)
+    # schedule.every(2).seconds.do(job)
     schedule.run_continuously()
+
+
+def job():
+    print "hi"
 
 
 if __name__ == '__main__':
@@ -35,5 +40,5 @@ if __name__ == '__main__':
 
     # t = Thread(target=run_scheduled_tasks)
     # t.start()
-    cm.update_all_cruises()
+    cm.get_new_cruises()
     app.run(use_reloader=False, debug=True)

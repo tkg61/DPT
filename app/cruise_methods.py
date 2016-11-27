@@ -25,6 +25,7 @@ def createroom(sailing_availability):
                 category = subtype['error']['typeId']
                 name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
                 r = Room(name, t, location, price, category, sailing_id, ship)
+                r.prices.append(Price(price, dt.now()))
                 db.session.add(r)
                 cruise.rooms.append(r)
                 #print "room error, unavailable"
@@ -38,6 +39,7 @@ def createroom(sailing_availability):
                     name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
                     #print details['startingFromPrice']['price']['summary']
                     r = Room(name, t, location, price, category, sailing_id, ship)
+                    r.prices.append(Price(price, dt.now()))
                     db.session.add(r)
                     cruise.rooms.append(r)
 
@@ -48,6 +50,7 @@ def createroom(sailing_availability):
                 category = subtype['startingFromPrice']['stateroomCategory'].split(';')[0].split('-', 1)[1]
                 name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
                 r = Room(name, t, location, price, category, sailing_id, ship)
+                r.prices.append(Price(price, dt.now()))
                 db.session.add(r)
                 cruise.rooms.append(r)
             else:
@@ -95,7 +98,6 @@ def createcruise(cruise_sailing):
 
     # assign ports to cruise
     for p in cruise_port_ids:
-        print p
         s = Port.query.get(p)
         cruise.ports_of_call.append(s)
 
@@ -116,7 +118,6 @@ def checkports(ports):
 
         value = db.session.query(Port.p_id).filter_by(name=name).first()
         if value:
-            print "port exists"
             p_objects.append(value.p_id)
         else:
             p = Port(name, i, location)
@@ -195,6 +196,8 @@ def update_cruise_pricing(sailing_id):
                 name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
                 room = Room.query.filter_by(name=name).first()
                 if str(room.price) != str(price):
+                    room.prices.append(Price(room.price, dt.now()))
+                    room.price = price
                     print "DIFFERENCE! detected. Current: " + str(room.price) + " New: " + price
 
             # parse regular room type
@@ -207,6 +210,8 @@ def update_cruise_pricing(sailing_id):
                     room = Room.query.filter_by(name=name).first()
                     if str(room.price) != str(price):
                         print "DIFFERENCE! detected. Current: " + str(room.price) + " New: " + price
+                        room.prices.append(Price(room.price, dt.now()))
+                        room.price = price
                         # FIGURE OUT IF PRICE RELATIONSHIP WORKS
                         # IF IT DOES, WORK ON TESTING NEW PRICES
 
@@ -220,9 +225,11 @@ def update_cruise_pricing(sailing_id):
                 room = Room.query.filter_by(name=name).first()
                 if str(room.price) != str(price):
                     print "DIFFERENCE! detected. Current: " + str(room.price) + " New: " + price
-
+                    room.prices.append(Price(room.price, dt.now()))
+                    room.price = price
             else:
                 print "new subtype: " + str(subtype)
+    db.session.commit()
 
 
 
@@ -237,12 +244,13 @@ def update_cruise_pricing(sailing_id):
 
 #update_cruise_pricing("DD0647")
 
-room = Room.query.filter_by(sailing_id="DD0647").first()
-print room.price
-room.prices.append(Price(1900, dt.now()))
-
-
-print room.prices
-print Price.query.filter_by(price=1900).first()
+# room = Room.query.filter_by(sailing_id="DD0647").first()
+# print room.price
+# room.prices.append(Price(1900, dt.now()))
+#
+#
+# for p in room.prices:
+#     print p.price
+# print Price.query.filter_by(price=1900).first().change_date
 
 # PRICE RELATIONSHIP TESTING^^^^

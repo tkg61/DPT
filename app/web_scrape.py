@@ -47,12 +47,16 @@ def has_token_expired():
 def getjsonfrompost(url, data, token=None):
     global post_retry
 
-    if token:
-        headers = {'Content-Type': "application/json",
-                   'Authorization': "BEARER " + token}
-        j = requests.post(url, json=data, headers=headers).json()
-    else:
-        j = requests.post(url, json=data).json()
+    try:
+        if token:
+            headers = {'Content-Type': "application/json",
+                       'Authorization': "BEARER " + token}
+            j = requests.post(url, json=data, headers=headers).json()
+        else:
+            j = requests.post(url, json=data).json()
+    except Exception as e:
+        print e
+        print j
 
     while post_retry < 4:
         if 'err' in j:
