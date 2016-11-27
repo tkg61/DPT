@@ -1,4 +1,3 @@
-from flask_sqlalchemy import SQLAlchemy
 from app import db
 from datetime import datetime as dt
 
@@ -27,6 +26,7 @@ class Room(db.Model):
     category = db.Column(db.String(120))  # 11b
     sailing_id = db.Column(db.String(120))
     ship = db.Column(db.String(120))
+    prices = db.relationship("Price", backref="rooms")
 
     _titles = {'INSIDE-STANDARD': 'Standard Inside Stateroom',
                'INSIDE-DELUXE': 'Deluxe Inside Stateroom',
@@ -123,3 +123,16 @@ class Port(db.Model):
         self.name = name
         self.port_id = port_id
         self.location = location
+
+
+class Price(db.Model):
+    __tablename__ = "prices"
+
+    price_id = db.Column(db.Integer, primary_key=True)
+    price = db.Column(db.Integer)
+    change_date = db.Column(db.DateTime)
+    room_id = db.Column(db.Integer, db.ForeignKey('rooms.r_id'))
+
+    def __init__(self, price, change_date):
+        self.price = price
+        self.change_date = change_date

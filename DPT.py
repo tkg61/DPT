@@ -1,8 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, abort, session
-from app import app, db, models, web_scrape as ws
+from app import app, db, models, web_scrape as ws, cruise_methods as cm
 import schedule
 import time
-from threading import Thread
 
 @app.route('/')
 def home():
@@ -26,13 +25,15 @@ def message():
                                            message=session['message'])
 
 def run_scheduled_tasks():
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
+    schedule.every(120).seconds.do(ws.refresh_token)
+    #schedule.every(2).seconds.do(job)
+    schedule.run_continuously()
 
 
 if __name__ == '__main__':
-    schedule.every(10).seconds.do(ws.refresh_token)
-    t = Thread(target=run_scheduled_tasks)
-    t.start()
-    app.run()
+    run_scheduled_tasks()
+
+    # t = Thread(target=run_scheduled_tasks)
+    # t.start()
+    cm.update_all_cruises()
+    app.run(use_reloader=False, debug=True)

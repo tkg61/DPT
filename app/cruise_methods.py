@@ -1,7 +1,7 @@
-from models import Room, Cruise, Port
-from app import db
+from app import db, Port, Cruise, Room, Price
 from datetime import datetime as dt
-from app import web_scrape as ws
+import web_scrape as ws
+
 
 def createroom(sailing_availability):
     sailing_id = sailing_availability['sailingId']
@@ -12,7 +12,7 @@ def createroom(sailing_availability):
 
     # iterate through all rooms (inside, ocean view, etc)
     for item in available_staterooms:
-        # iterate through all subtypes of rooms (mainly location, aft, mid, forward)
+        # iterate through all subtypes of rooms (mainly location: aft, mid, forward)
         for subtype in item['stateroomSubTypes']:
             id = subtype['id'].split(';')[0].split('-', 1)
             t = id[1]
@@ -41,7 +41,7 @@ def createroom(sailing_availability):
                     db.session.add(r)
                     cruise.rooms.append(r)
 
-            # Room without specified location and is ther is a "guareentee" you will get a room
+            # Room without specified location and is there is a "guareentee" you will get a room
             elif subtype['startingFromPrice']['offerType'] == 'GTY' or subtype['startingFromPrice']['offerType'] == "IGT_OGT_VGT":
                 location = "Unknown"
                 price = subtype['startingFromPrice']['price']['summary']['total']
@@ -51,8 +51,7 @@ def createroom(sailing_availability):
                 db.session.add(r)
                 cruise.rooms.append(r)
             else:
-
-                print subtype
+                print "new subtype: " + str(subtype)
 
     db.session.commit()
 
@@ -106,7 +105,6 @@ def createcruise(cruise_sailing):
 
 
 def checkports(ports):
-
     p_objects = []
 
     for item in ports:
@@ -133,40 +131,118 @@ def cruiseexists(id):
     return True if Cruise.query.filter_by(sailing_id=id).first() else False
 
 
-def update_all_cruises(token):
-    t = ws.gettoken()["access_token"]
-    ids = ws.getalllistingids(t)
+def get_cruise(id):
+
+    url, pdata = ws.generatepostdataandurl(str(id))
+
+    return ws.getjsonfrompost(url, pdata, ws.auth_token)
+
+
+def get_new_cruises():
+    ids = ws.getalllistingids(ws.auth_token)
 
     for id in ids:
 
         if not cruiseexists(id):
 
-            url, pdata = ws.generatepostdataandurl(str(id))
-
-            print "got url for id: " + id
-
-            j = ws.getjsonfrompost(url, pdata, t)
-
-            if 'err' in j:
-                while j['err']:
-                    print "Token expired, getting a new one"
-                    t = gettoken()["access_token"]
-
-                    j = getjsonfrompost(url, pdata, t)  # retry getting data
-
-            #print "got json for id: " + id
+            j = get_cruise(id)
 
             try:
-                cm.createcruise(j["cruise-sailing"])
+                createcruise(j["cruise-sailing"])
             except Exception as e:
                 print e
                 print j
             try:
-                cm.createroom(j["sailing-availability"])
+                createroom(j["sailing-availability"])
             except Exception as e:
                 print e
                 print j
 
             print "created objects for cruise and room for id: " + id
         else:
+
             print "cruise exists: " + id
+
+
+def update_cruise_pricing(sailing_id):
+
+    # get latest cruise JSON from the web
+    j = get_cruise(sailing_id)
+
+    # grab all rooms with the same sailing id
+
+
+    #debug print rooms and prices
+    # for room in rooms:
+    #     print str(room.name) + " : " + str(room.price)
+
+    sailing_id = j["sailing-availability"]['sailingId']
+    available_staterooms = j["sailing-availability"]['startingFromPriceByPartyMix'][0]['stateroomTypes']
+
+    # iterate through all rooms (inside, ocean view, etc)
+    for item in available_staterooms:
+        # iterate through all subtypes of rooms (mainly location: aft, mid, forward)
+        for subtype in item['stateroomSubTypes']:
+            id = subtype['id'].split(';')[0].split('-', 1)
+            t = id[1]
+            ship = id[0]
+
+            # if there is an error then the room is not available
+            if 'error' in subtype:
+                location = "N/A"
+                price = "NULL"
+                category = subtype['error']['typeId']
+                name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
+                room = Room.query.filter_by(name=name).first()
+                if str(room.price) != str(price):
+                    print "DIFFERENCE! detected. Current: " + str(room.price) + " New: " + price
+
+            # parse regular room type
+            elif subtype['startingFromPrice']['offerType'] == 'REGULAR':
+                for details in subtype['locations']:
+                    location = details['id']
+                    price = details['startingFromPrice']['price']['summary']['total']
+                    category = details['startingFromPrice']['stateroomCategory'].split(';')[0].split('-', 1)[1]
+                    name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
+                    room = Room.query.filter_by(name=name).first()
+                    if str(room.price) != str(price):
+                        print "DIFFERENCE! detected. Current: " + str(room.price) + " New: " + price
+                        # FIGURE OUT IF PRICE RELATIONSHIP WORKS
+                        # IF IT DOES, WORK ON TESTING NEW PRICES
+
+            # Room without specified location and is there is a "guareentee" you will get a room
+            elif subtype['startingFromPrice']['offerType'] == 'GTY' or subtype['startingFromPrice'][
+                'offerType'] == "IGT_OGT_VGT":
+                location = "Unknown"
+                price = subtype['startingFromPrice']['price']['summary']['total']
+                category = subtype['startingFromPrice']['stateroomCategory'].split(';')[0].split('-', 1)[1]
+                name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
+                room = Room.query.filter_by(name=name).first()
+                if str(room.price) != str(price):
+                    print "DIFFERENCE! detected. Current: " + str(room.price) + " New: " + price
+
+            else:
+                print "new subtype: " + str(subtype)
+
+
+
+    # compare rooms in json to rooms in DB
+        # if type changes.... not sure
+    # if price changes take current price and put in price_over_time table
+    # update price in rooms table with new price
+
+
+
+#update_all_cruises()
+
+#update_cruise_pricing("DD0647")
+
+room = Room.query.filter_by(sailing_id="DD0647").first()
+print room.price
+room.prices.append(Price(1900, dt.now()))
+
+
+print room.prices
+print Price.query.filter_by(price=1900).first()
+
+# PRICE RELATIONSHIP TESTING^^^^
