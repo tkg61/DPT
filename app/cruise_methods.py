@@ -20,7 +20,7 @@ def createroom(sailing_availability):
 
             # if there is an error then the room is not available
             if 'error' in subtype:
-                location = "Unknown"
+                location = "N/A"
                 price = "NULL"
                 category = subtype['error']['typeId']
                 name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
@@ -194,11 +194,7 @@ def update_cruise_pricing(sailing_id):
                 price = "NULL"
                 category = subtype['error']['typeId']
                 name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
-                room = Room.query.filter_by(name=name).first()
-                if str(room.price) != str(price):
-                    room.prices.append(Price(room.price, dt.now()))
-                    room.price = price
-                    print "DIFFERENCE! detected. Current: " + str(room.price) + " New: " + price
+                update_room_price(name, price)
 
             # parse regular room type
             elif subtype['startingFromPrice']['offerType'] == 'REGULAR':
@@ -207,29 +203,18 @@ def update_cruise_pricing(sailing_id):
                     price = details['startingFromPrice']['price']['summary']['total']
                     category = details['startingFromPrice']['stateroomCategory'].split(';')[0].split('-', 1)[1]
                     name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
-                    room = Room.query.filter_by(name=name).first()
-                    if str(room.price) != str(price):
-                        print "DIFFERENCE! detected. Current: " + str(room.price) + " New: " + price
-                        room.prices.append(Price(room.price, dt.now()))
-                        room.price = price
-                        # FIGURE OUT IF PRICE RELATIONSHIP WORKS
-                        # IF IT DOES, WORK ON TESTING NEW PRICES
+                    update_room_price(name, price)
 
             # Room without specified location and is there is a "guareentee" you will get a room
             elif subtype['startingFromPrice']['offerType'] == 'GTY' or subtype['startingFromPrice'][
-                'offerType'] == "IGT_OGT_VGT":
+                        'offerType'] == "IGT_OGT_VGT":
                 location = "Unknown"
                 price = subtype['startingFromPrice']['price']['summary']['total']
                 category = subtype['startingFromPrice']['stateroomCategory'].split(';')[0].split('-', 1)[1]
                 name = sailing_id + "-" + ship + "-" + t + "-" + location + "-" + category
-                room = Room.query.filter_by(name=name).first()
-                if str(room.price) != str(price):
-                    print "DIFFERENCE! detected. Current: " + str(room.price) + " New: " + price
-                    room.prices.append(Price(room.price, dt.now()))
-                    room.price = price
+                update_room_price(name, price)
             else:
                 print "new subtype: " + str(subtype)
-    db.session.commit()
 
 
 
@@ -239,18 +224,40 @@ def update_cruise_pricing(sailing_id):
     # update price in rooms table with new price
 
 
+def update_room_price(room_name, price):
+    room = Room.query.filter_by(name=room_name).first()
+
+    if room:
+        if str(room.price) != str(price):
+            room.prices.append(Price(room.price, dt.now()))
+            room.price = price
+            print "DIFFERENCE! detected. Current: " + str(room.price) + " New: " + price
+            db.session.commit()
+    else:
+        print "room not found: " + room_name
+
+
 
 #update_all_cruises()
 
 #update_cruise_pricing("DD0647")
-
-# room = Room.query.filter_by(sailing_id="DD0647").first()
+#room = Room.query.filter_by(name='DD0647-DD-INSIDE-STANDARD-MID-10C').first()
+# room = Room.query.filter_by(location="N/A").first()
+# print room.name
+# # room = Room.query.filter_by(sailing_id="DD0647").first()
 # print room.price
 # room.prices.append(Price(1900, dt.now()))
 #
 #
 # for p in room.prices:
 #     print p.price
-# print Price.query.filter_by(price=1900).first().change_date
+# print Price.query.filter_by(price="NULL").first().change_date
 
 # PRICE RELATIONSHIP TESTING^^^^
+
+# db.session.query(Price).delete()
+# db.session.query(Room).delete()
+# db.session.commit()
+# db.session.query("cruise_to_room").delete()
+# db.session.query(Cruise).delete()
+# db.session.query(ports).delete()

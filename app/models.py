@@ -7,9 +7,9 @@ cruise_to_port = db.Table('cruise_to_port',
                           db.Column('p_id', db.Integer, db.ForeignKey('ports.p_id'))
                           )
 cruise_to_room = db.Table('cruise_to_room',
-                           db.Column('c_id', db.Integer, db.ForeignKey('cruises.c_id')),
-                           db.Column('r_id', db.Integer, db.ForeignKey('rooms.r_id'))
-                           )
+                          db.Column('c_id', db.Integer, db.ForeignKey('cruises.c_id')),
+                          db.Column('r_id', db.Integer, db.ForeignKey('rooms.r_id'))
+                          )
 # endregion
 
 
@@ -26,7 +26,7 @@ class Room(db.Model):
     category = db.Column(db.String(120))  # 11b
     sailing_id = db.Column(db.String(120))
     ship = db.Column(db.String(120))
-    prices = db.relationship("Price", backref="rooms")
+    prices = db.relationship("Price", backref="rooms", passive_deletes=True)
 
     _titles = {'INSIDE-STANDARD': 'Standard Inside Stateroom',
                'INSIDE-DELUXE': 'Deluxe Inside Stateroom',
@@ -131,8 +131,12 @@ class Price(db.Model):
     price_id = db.Column(db.Integer, primary_key=True)
     price = db.Column(db.Integer)
     change_date = db.Column(db.DateTime)
-    room_id = db.Column(db.Integer, db.ForeignKey('rooms.r_id'))
+    room_id = db.Column(db.Integer, db.ForeignKey('rooms.r_id', ondelete='CASCADE'))
 
     def __init__(self, price, change_date):
         self.price = price
         self.change_date = change_date
+
+
+
+
